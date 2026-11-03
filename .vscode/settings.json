@@ -1,0 +1,21 @@
+{
+    "files.associations": {
+        "lv_ffmpeg.h": "c",
+        "lv_image.h": "c",
+        "lvgl.h": "c",
+        "ui_main.h": "c",
+        "page1.h": "c",
+        "*.tcc": "c",
+        "fstream": "c",
+        "iosfwd": "c",
+        "istream": "c",
+        "limits": "c",
+        "sstream": "c",
+        "streambuf": "c",
+        "mqtt_defconfig.h": "c",
+        "mqtt_config.h": "c",
+        "mqtt.h": "c",
+        "mqtt_log.h": "c",
+        "serial_init.h": "c"
+    }
+}
