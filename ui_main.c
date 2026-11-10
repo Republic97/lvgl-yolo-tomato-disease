@@ -55,7 +55,7 @@ static void page_main(void)
 
     lv_font_t * font1 = lv_freetype_font_create("A:/home/wuyue/Desktop/lvgl_v9_demo/apple_black.ttf",
         LV_FREETYPE_FONT_RENDER_MODE_BITMAP,
-        80,
+        60,
         LV_FREETYPE_FONT_STYLE_NORMAL);//虫情测报仪字体路径
         
     lv_font_t * font2 = lv_freetype_font_create("A:/home/wuyue/Desktop/lvgl_v9_demo/apple_black.ttf",
@@ -74,8 +74,8 @@ static void page_main(void)
 
     label = lv_label_create(g_page_cont);
     lv_obj_add_style(label, &style1, 0);
-    lv_label_set_text(label, "虫情测报仪");    
-    lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 50);//"虫情测报仪"标签
+    lv_label_set_text(label, "番茄叶片病虫害检测系统");    
+    lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 90);//"虫情测报仪"标签
 
     static lv_style_t style_symbol;
     lv_style_init(&style_symbol);
