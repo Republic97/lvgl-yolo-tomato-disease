@@ -124,7 +124,7 @@ int main(void)
     lv_linux_fbdev_set_file(disp, "/dev/fb0");
 
     lv_indev_t * touch;
-    touch = lv_evdev_create(LV_INDEV_TYPE_POINTER,"/dev/input/event7");
+    touch = lv_evdev_create(LV_INDEV_TYPE_POINTER,"/dev/input/event1");
 
     if (pthread_mutex_init(&g_lock, NULL) != 0) { //初始化互斥锁
          LV_LOG_ERROR("\n mutex init has failed!"); 
