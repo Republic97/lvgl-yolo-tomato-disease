@@ -161,6 +161,7 @@ static pid_t camera_process_start(camera_preview_t * preview,
         }
         close(pipe_fd[1]);
 
+        /* Camera Module 3 is mounted upside down; correct it at capture time. */
         execlp("libcamera-vid",
                "libcamera-vid",
                "--timeout", "0",
@@ -169,6 +170,7 @@ static pid_t camera_process_start(camera_preview_t * preview,
                "--width", width_text,
                "--height", height_text,
                "--framerate", frame_rate_text,
+               "--rotation", "180",
                "--autofocus-mode", "continuous",
                "--verbose", "0",
                "--output", "-",
