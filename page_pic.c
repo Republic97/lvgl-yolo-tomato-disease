@@ -9,6 +9,7 @@
 
 
 #include "page_pic.h"
+#include "camera_preview.h"
 #include "servo_control.h"
 
 #if 1
@@ -19,6 +20,7 @@ static void page_close_event_handler(lv_event_t * e);
 static void direction_button_event_handler(lv_event_t * e);
 static void inference_toggle_event_handler(lv_event_t * e);
 static void init_visual_resources(void);
+static void camera_refresh_timer_cb(lv_timer_t * timer);
 static void servo_move_timer_cb(lv_timer_t * timer);
 static lv_obj_t * create_overlay_button(lv_obj_t * parent,
                                         const char * text,
@@ -35,6 +37,13 @@ static lv_obj_t * create_overlay_button(lv_obj_t * parent,
 #define PREVIEW_PANEL_WIDTH 520
 #define RESULT_PANEL_WIDTH 244
 
+#define CAMERA_CAPTURE_WIDTH 640
+#define CAMERA_CAPTURE_HEIGHT 480
+#define CAMERA_DISPLAY_WIDTH 512
+#define CAMERA_DISPLAY_HEIGHT 384
+#define CAMERA_FRAME_RATE 30
+#define CAMERA_REFRESH_TIME 33
+
 typedef enum {
     DISPLAY_MODE_PREVIEW,
     DISPLAY_MODE_INFERENCE_RESULT
@@ -43,6 +52,9 @@ typedef enum {
 static lv_obj_t * g_result_summary_label;
 static lv_obj_t * g_preview_cont;
 static lv_obj_t * g_preview_label;
+static camera_preview_t * g_camera_preview;
+static lv_timer_t * g_camera_refresh_timer;
+static camera_preview_state_t g_camera_state = CAMERA_PREVIEW_STATE_IDLE;
 static lv_font_t * g_font_aw;
 static lv_font_t * g_font_cn;
 static lv_style_t g_back_style;
@@ -110,7 +122,7 @@ static uint16_t page_open(void)
     lv_obj_set_style_bg_opa(content_cont, LV_OPA_TRANSP, 0);
     lv_obj_remove_flag(content_cont, LV_OBJ_FLAG_SCROLLABLE);
 
-    /* 左侧预览区：后续在树莓派上用实时摄像头画面替换背景。 */
+    /* 左侧预览区：libcamera-vid 获取 Camera Module 3 画面，FFmpeg 转为 RGB565。 */
     g_preview_cont = lv_obj_create(content_cont);
     lv_obj_set_size(g_preview_cont, PREVIEW_PANEL_WIDTH, DISPLAY_PANEL_HEIGHT);
     lv_obj_align(g_preview_cont, LV_ALIGN_TOP_LEFT, 12, 12);
@@ -123,11 +135,18 @@ static uint16_t page_open(void)
     lv_obj_set_style_shadow_width(g_preview_cont, 0, 0);
     lv_obj_remove_flag(g_preview_cont, LV_OBJ_FLAG_SCROLLABLE);
 
+    g_camera_preview = camera_preview_create(g_preview_cont,
+                                             CAMERA_CAPTURE_WIDTH,
+                                             CAMERA_CAPTURE_HEIGHT,
+                                             CAMERA_DISPLAY_WIDTH,
+                                             CAMERA_DISPLAY_HEIGHT,
+                                             CAMERA_FRAME_RATE);
+
     g_preview_label = lv_label_create(g_preview_cont);
     lv_obj_set_style_text_font(g_preview_label, g_font_cn, 0);
     lv_obj_set_style_text_color(g_preview_label, lv_color_hex(0xD1D5DB), 0);
     lv_obj_set_style_text_align(g_preview_label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_text(g_preview_label, "摄像头实时预览\n（电脑模拟）");
+    lv_label_set_text(g_preview_label, "正在连接摄像头...");
     lv_obj_align(g_preview_label, LV_ALIGN_CENTER, 0, -55);
     g_display_mode = DISPLAY_MODE_PREVIEW;
 
@@ -213,6 +232,16 @@ static uint16_t page_open(void)
                                      NULL);
 	lv_timer_pause(g_servo_move_timer);
 
+    if(g_camera_preview != NULL) {
+        camera_preview_start(g_camera_preview);
+        g_camera_refresh_timer = lv_timer_create(camera_refresh_timer_cb,
+                                                 CAMERA_REFRESH_TIME,
+                                                 NULL);
+    }
+    else {
+        lv_label_set_text(g_preview_label, "摄像头预览初始化失败");
+    }
+
     return 0;
 }
 
@@ -265,6 +294,42 @@ static lv_obj_t * create_overlay_button(lv_obj_t * parent,
     lv_obj_center(label);
 
     return btn;
+}
+
+static void camera_refresh_timer_cb(lv_timer_t * timer)
+{
+    camera_preview_state_t state;
+
+    LV_UNUSED(timer);
+
+    if(g_camera_preview == NULL || g_preview_label == NULL) {
+        return;
+    }
+
+    camera_preview_refresh(g_camera_preview);
+    state = camera_preview_get_state(g_camera_preview);
+
+    if(state != g_camera_state) {
+        if(state == CAMERA_PREVIEW_STATE_STREAMING) {
+            lv_obj_add_flag(g_preview_label, LV_OBJ_FLAG_HIDDEN);
+            LV_LOG_USER("Camera Module 3 preview started");
+        }
+        else if(state == CAMERA_PREVIEW_STATE_CONNECTING) {
+            lv_obj_remove_flag(g_preview_label, LV_OBJ_FLAG_HIDDEN);
+            lv_label_set_text(g_preview_label, "正在连接摄像头...");
+        }
+        else if(state == CAMERA_PREVIEW_STATE_ERROR) {
+            char error_text[160];
+            lv_obj_remove_flag(g_preview_label, LV_OBJ_FLAG_HIDDEN);
+            lv_label_set_text(g_preview_label,
+                              "摄像头启动失败\n请检查 Camera Module 3");
+            camera_preview_get_error(g_camera_preview,
+                                     error_text,
+                                     sizeof(error_text));
+            LV_LOG_ERROR("camera preview: %s", error_text);
+        }
+        g_camera_state = state;
+    }
 }
 
 static void servo_move_timer_cb(lv_timer_t * timer)
@@ -374,21 +439,9 @@ static void inference_toggle_event_handler(lv_event_t * e)
 {
     LV_UNUSED(e);
 
-    if(g_preview_cont == NULL || g_preview_label == NULL) {
-        return;
-    }
-
+    /* 阶段 1 只实现实时预览；暂停和保留最后一帧将在阶段 2 实现。 */
     if(g_display_mode == DISPLAY_MODE_PREVIEW) {
-        g_display_mode = DISPLAY_MODE_INFERENCE_RESULT;
-        LV_LOG_USER("display mode: inference result");
-        lv_obj_set_style_bg_color(g_preview_cont, lv_color_hex(0x173B32), 0);
-        lv_label_set_text(g_preview_label, "FCE-YOLO 推理结果\n（电脑模拟）");
-    }
-    else {
-        g_display_mode = DISPLAY_MODE_PREVIEW;
-        LV_LOG_USER("display mode: camera preview");
-        lv_obj_set_style_bg_color(g_preview_cont, lv_color_hex(0x202830), 0);
-        lv_label_set_text(g_preview_label, "摄像头实时预览\n（电脑模拟）");
+        LV_LOG_USER("inference toggle is reserved for stage 2");
     }
 }
 
@@ -396,15 +449,24 @@ static uint16_t page_close(void)
 {
    lv_obj_t * page_cont = lv_my_ui_page_pic_t.page_cont;
    lv_my_ui_page_pic_t.page_cont = NULL;
-   g_result_summary_label = NULL;
-   g_preview_cont = NULL;
-   g_preview_label = NULL;
    g_display_mode = DISPLAY_MODE_PREVIEW;
    g_servo_move = SERVO_MOVE_NONE;
+   g_camera_state = CAMERA_PREVIEW_STATE_IDLE;
+   if(g_camera_refresh_timer != NULL) {
+    lv_timer_delete(g_camera_refresh_timer);
+    g_camera_refresh_timer = NULL;
+   }
+   if(g_camera_preview != NULL) {
+    camera_preview_destroy(g_camera_preview);
+    g_camera_preview = NULL;
+   }
    if(g_servo_move_timer != NULL) {
     lv_timer_delete(g_servo_move_timer);
     g_servo_move_timer = NULL;
    }
+   g_result_summary_label = NULL;
+   g_preview_cont = NULL;
+   g_preview_label = NULL;
    lv_obj_delete(page_cont);
    my_ui_main_go_back_handle();
    return 0;

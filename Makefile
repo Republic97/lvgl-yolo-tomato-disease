@@ -59,6 +59,7 @@ CSRCS 			+=$(LVGL_DIR)/page1.c
 CSRCS 			+=$(LVGL_DIR)/page2.c 
 CSRCS 			+=$(LVGL_DIR)/page_pic.c 
 CSRCS 			+=$(LVGL_DIR)/page_rain.c 
+CSRCS 			+=$(LVGL_DIR)/camera_preview.c 
 #CSRCS 			+=$(LVGL_DIR)/mqtt.c 
 CSRCS 			+=$(LVGL_DIR)/serial_init.c 
 CSRCS 			+=$(LVGL_DIR)/servo_control.c 
