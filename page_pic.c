@@ -374,10 +374,11 @@ static void servo_move_timer_cb(lv_timer_t * timer)
             break;
 
         case SERVO_MOVE_UP:
-            next_angle = g_tilt_angle + SERVO_STEP_ANGLE;
+            /* The tilt servo is mounted in reverse: a smaller angle points up. */
+            next_angle = g_tilt_angle - SERVO_STEP_ANGLE;
 
-            if(next_angle > TILT_MAX_ANGLE) {
-                next_angle = TILT_MAX_ANGLE;
+            if(next_angle < TILT_MIN_ANGLE) {
+                next_angle = TILT_MIN_ANGLE;
             }
 
             if(next_angle == g_tilt_angle) {
@@ -392,10 +393,10 @@ static void servo_move_timer_cb(lv_timer_t * timer)
             break;
 
         case SERVO_MOVE_DOWN:
-            next_angle = g_tilt_angle - SERVO_STEP_ANGLE;
+            next_angle = g_tilt_angle + SERVO_STEP_ANGLE;
 
-            if(next_angle < TILT_MIN_ANGLE) {
-                next_angle = TILT_MIN_ANGLE;
+            if(next_angle > TILT_MAX_ANGLE) {
+                next_angle = TILT_MAX_ANGLE;
             }
 
             if(next_angle == g_tilt_angle) {
